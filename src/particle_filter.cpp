@@ -40,18 +40,17 @@ void ParticleFilter::init(double x, double y, double theta, double std[])
   std::normal_distribution<double> dist_y(y, std[1]);
   std::normal_distribution<double> dist_theta(theta, std[2]);
 
-  double weight = 1.0;
-
   for (int i = 0; i < num_particles; ++i)
   {
     Particle particle;
     particle.x = dist_x(gen);
     particle.y = dist_y(gen);
     particle.theta = dist_theta(gen);
-    particle.weight = weight;
+    particle.weight = 1.0;
     particles.push_back(particle);
-    weights.push_back(weight);
+    weights.push_back(1.0);
   }
+  is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[],
@@ -72,9 +71,18 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 
   for (auto &particle : particles)
   {
-    particle.x += (velocity / yaw_rate) * (sin(particle.theta + yaw_rate * delta_t) - sin(particle.theta)) + dist_x(gen);
-    particle.y += (velocity / yaw_rate) * (cos(particle.theta) - cos(particle.theta + yaw_rate * delta_t)) + dist_y(gen);
-    particle.theta += delta_t * yaw_rate + dist_theta(gen);
+    if (yaw_rate != 0)
+    {
+      particle.x += (velocity / yaw_rate) * (sin(particle.theta + yaw_rate * delta_t) - sin(particle.theta)) + dist_x(gen);
+      particle.y += (velocity / yaw_rate) * (cos(particle.theta) - cos(particle.theta + yaw_rate * delta_t)) + dist_y(gen);
+      particle.theta += delta_t * yaw_rate + dist_theta(gen);
+    }
+    else
+    {
+      particle.x += delta_t * velocity * cos(particle.theta) + dist_x(gen);
+      particle.y += delta_t * velocity * sin(particle.theta) + dist_y(gen);
+      particle.theta += dist_theta(gen);
+    }
   }
 }
 
@@ -115,7 +123,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     p.associations.clear();
     p.sense_x.clear();
     p.sense_y.clear();
-    
+
     for (auto obs : observations)
     {
       double x_map = p.x + (cos(p.theta) * obs.x) - (sin(p.theta) * obs.y);
@@ -128,7 +136,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       for (auto &landmark : map_landmarks.landmark_list)
       {
         float distance = sqrt(pow(landmark.x_f - x_map, 2) + pow(landmark.y_f - y_map, 2));
-        if (distance < min_distance && distance <= sensor_range)
+        if (distance < min_distance)
         {
           min_distance = distance;
           best = landmark;
@@ -138,9 +146,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
       if (is_association)
       {
-        p.weight *= multiv_prob(best.x_f,
-                                best.y_f, x_map, y_map,
-                                std_landmark[0], std_landmark[1]);
+        p.weight *= multiv_prob(std_landmark[0], std_landmark[1],
+                                x_map, y_map, best.x_f,
+                                best.y_f);
         p.associations.push_back(best.id_i);
         p.sense_x.push_back(x_map);
         p.sense_y.push_back(y_map);
@@ -182,15 +190,14 @@ void ParticleFilter::resample()
 
   std::default_random_engine gen;
 
-  vector<double> probs;
-  for (auto &p : particles)
+  for (int i = 0; i < particles.size(); ++i)
   {
-    probs.push_back(p.weight);
+    weights.at(i) = particles.at(i).weight;
   }
 
-  std::discrete_distribution<int> distribution(probs.begin(), probs.end());
+  std::discrete_distribution<int> distribution(weights.begin(), weights.end());
 
-  vector<Particle> new_particles(num_particles);
+  vector<Particle> new_particles;
 
   for (int i = 0; i < num_particles; ++i)
   {
