@@ -33,7 +33,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[])
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  num_particles = 30; // TODO: Set the number of particles
+  num_particles = 100; // TODO: Set the number of particles
 
   std::default_random_engine gen;
   std::normal_distribution<double> dist_x(x, std[0]);
@@ -123,11 +123,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     p.associations.clear();
     p.sense_x.clear();
     p.sense_y.clear();
-
+    double cos_theta = cos(p.theta);
+    double sin_theta = sin(p.theta);
     for (auto obs : observations)
     {
-      double x_map = p.x + (cos(p.theta) * obs.x) - (sin(p.theta) * obs.y);
-      double y_map = p.y + (sin(p.theta) * obs.x) + (cos(p.theta) * obs.y);
+      double x_map = p.x + (cos_theta * obs.x) - (sin_theta * obs.y);
+      double y_map = p.y + (sin_theta * obs.x) + (cos_theta * obs.y);
 
       float min_distance = std::numeric_limits<float>::max();
       bool is_association = false;
@@ -135,13 +136,19 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
       for (auto &landmark : map_landmarks.landmark_list)
       {
+        if (fabs(landmark.x_f - p.x) > sensor_range ||  fabs(landmark.y_f - p.y) > sensor_range){
+          continue;
+        }
+
         float distance = sqrt(pow(landmark.x_f - x_map, 2) + pow(landmark.y_f - y_map, 2));
+
         if (distance < min_distance)
         {
           min_distance = distance;
           best = landmark;
           is_association = true;
         }
+      
       }
 
       if (is_association)

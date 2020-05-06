@@ -120,6 +120,7 @@ class ParticleFilter {
   
   // Vector of weights of all particles
   std::vector<double> weights; 
+  
 };
 
 #endif  // PARTICLE_FILTER_H_

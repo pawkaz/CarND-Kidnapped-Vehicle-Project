@@ -4,7 +4,7 @@
 #include <string>
 #include "json.hpp"
 #include "particle_filter.h"
-
+#include <chrono> 
 // for convenience
 using nlohmann::json;
 using std::string;
@@ -75,8 +75,11 @@ int main() {
             //   (noiseless control) data.
             double previous_velocity = std::stod(j[1]["previous_velocity"].get<string>());
             double previous_yawrate = std::stod(j[1]["previous_yawrate"].get<string>());
-
+            auto start = std::chrono::high_resolution_clock::now();
             pf.prediction(delta_t, sigma_pos, previous_velocity, previous_yawrate);
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
+            std::cout << "Prediction step: "<< duration.count() << std::endl;
           }
 
           // receive noisy observation data from the simulator
@@ -108,9 +111,19 @@ int main() {
           }
 
           // Update the weights and resample
+          auto start = std::chrono::high_resolution_clock::now(); 
           pf.updateWeights(sensor_range, sigma_landmark, noisy_observations, map);
-          pf.resample();
+          auto end = std::chrono::high_resolution_clock::now(); 
 
+          auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
+          std::cout << "Update step: "<< duration.count() << std::endl;        
+
+          start = std::chrono::high_resolution_clock::now(); 
+          pf.resample();
+          end = std::chrono::high_resolution_clock::now(); 
+
+          duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
+          std::cout << "Resample step: "<< duration.count() << std::endl;
           // Calculate and output the average weighted error of the particle 
           //   filter over all time steps so far.
           vector<Particle> particles = pf.particles;
